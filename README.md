@@ -12,7 +12,7 @@ Il progetto nasce come attività di gruppo con l’obiettivo di applicare in mod
 
 | Nome | Ruolo |
 |---|---|
-| Jonathan Punzo | Membro del team |
+| Jonathan Punzo | Portavoce del Team|
 | Felice Iandoli | Membro del team |
 | Andrea Botta | Membro del team |
 | Mariagiusy Cientanni | Membro del team |
