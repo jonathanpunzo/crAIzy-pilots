@@ -1,18 +1,18 @@
-# 🚀 IBM SkillsBuild Project
+# 🚀 crAIzy pilots
 
 Repository ufficiale del progetto sviluppato nell’ambito del percorso formativo **IBM SkillsBuild**.
 
-Il progetto nasce come attività di gruppo con l’obiettivo di applicare in modo pratico le competenze acquisite durante i corsi, lavorando su un’idea concreta, documentata e sviluppata in maniera collaborativa.
+Il progetto nasce come attività di gruppo con l’obiettivo di applicare in modo pratico le competenze acquisite durante i corsi IBM SkillsBuild, lavorando su un’idea concreta, documentata e sviluppata in maniera collaborativa.
 
 ---
 
 ## 👥 Team
 
-**Nome gruppo:** SkillBuilders Team
+**Nome gruppo:** crAIzy pilots
 
 | Nome | Ruolo |
 |---|---|
-| Jonathan Punzo | Portavoce del Team|
+| Jonathan Punzo | Portavoce del gruppo |
 | Felice Iandoli | Membro del team |
 | Andrea Botta | Membro del team |
 | Mariagiusy Cientanni | Membro del team |
@@ -22,7 +22,7 @@ Il progetto nasce come attività di gruppo con l’obiettivo di applicare in mod
 
 ## 📌 Descrizione del progetto
 
-Questo repository contiene il materiale, il codice e la documentazione prodotti durante il percorso IBM SkillsBuild.
+Questo repository contiene il materiale, il codice e la documentazione prodotti durante il percorso **IBM SkillsBuild**.
 
 Al momento il progetto è in fase iniziale: la struttura verrà aggiornata progressivamente con l’avanzamento delle attività, l’aggiunta dei contenuti tecnici e lo sviluppo delle funzionalità previste.
 
@@ -56,7 +56,7 @@ Durante il progetto verranno approfonditi temi legati a:
 ## 📂 Struttura del repository
 
 ```text
-IBM-SkillsBuild-Project/
+crAIzy-pilots/
 │
 ├── README.md
 ├── docs/
