@@ -1,110 +1,119 @@
-# crAIzy pilots - TORCS AI Racing League
+# crAIzy pilots - TORCS Plug and Play
 
-Repository ufficiale del progetto **crAIzy pilots**, sviluppato per la IBM AI Racing League / UNISA nell'ambito del percorso IBM SkillsBuild.
+Progetto Python per TORCS / IBM AI Racing League sul circuito Corkscrew.
 
-Il progetto consiste in un AI driver Python per TORCS, pensato per ottenere il miglior giro possibile sul circuito Corkscrew rispettando le linee guida della competizione: codice IA modificabile, partenza da fermo, uso documentato di IBM Granite / SkillsBuild, repository accessibile e materiali di submission.
+La cartella contiene due soli programmi da avviare:
 
-## Team
+- `craizy_manual.py`: guida con DualShock 4 e raccolta del dataset;
+- `craizy_auto.py`: guida autonoma stabile con supporto diretto al dataset umano.
 
-**Nome gruppo:** crAIzy pilots
+I file originali usati come base restano nella radice e non vengono modificati:
 
-| Nome | Ruolo |
-| --- | --- |
-| Jonathan Punzo | Portavoce del gruppo |
-| Felice Iandoli | Membro del team |
-| Andrea Botta | Membro del team |
-| Mariagiusy Cientanni | Membro del team |
-| Simona Ravotti | Membro del team |
+- `controller_ps4_torcs_dataset_auto_stop_v2 (1).py`;
+- `torcs_jm_par_modulare.py`.
 
-## Requisiti di gara
+## Requisiti
 
-- TORCS versione Python.
-- Circuito ufficiale: Corkscrew.
-- Giro valido da partenza ferma.
-- Driver TORCS: `scr_server 1`.
-- Modifiche limitate al codice Python dell'IA.
-- Video giro veloce, video team in inglese max 3 minuti, repository, certificati SkillsBuild e submit finale.
+- Python 3;
+- `pygame`;
+- TORCS gia installato e configurato;
+- `scr_server 1` in ascolto sulla porta `3001`.
 
-## Struttura
+Installazione:
 
-```text
-src/
-  torcs_jm_par.py        # entrypoint per TORCS
-  manual_control.py      # controller manuale
-  torcs_client.py        # client UDP compatibile SnakeOil/SCR
-  driver/                # logica modulare del pilota
-    config.py            # parametri gara hardcoded in Python
-  training/              # behavioral cloning e valutazione
-  utils/                 # report, plot e riepiloghi
-docs/                    # strategia, Granite log, checklist, video/blog
-data/                    # dataset manuali o telemetry esportata
-results/                 # log CSV e report locali
-media/                   # video, screenshot, asset team
-tests/                   # test unitari del controller
+```powershell
+py -m pip install -r requirements.txt
 ```
 
-## Avvio automatico
+## Preparazione TORCS
 
 1. Apri TORCS.
-2. Vai su `Race -> Practice` o `Race -> Quick Race -> Configure Race`.
-3. Seleziona Corkscrew.
-4. Seleziona `scr_server 1` come driver.
-5. Avvia `New Race`, lasciando TORCS in attesa del client.
-6. Da PowerShell:
+2. Seleziona il circuito Corkscrew.
+3. Seleziona `scr_server 1` come pilota.
+4. Avvia la gara e lascia TORCS in attesa del client Python.
+
+La cartella del gioco TORCS non fa parte di questo repository.
+
+## Guida manuale e dataset
+
+Collega il DualShock 4 tramite USB o Bluetooth, poi esegui:
 
 ```powershell
-py .\src\torcs_jm_par.py --port 3001
+py craizy_manual.py
 ```
 
-Oppure:
+Comandi predefiniti:
 
-```powershell
-.\scripts\run_race.ps1
+- stick sinistro: sterzo;
+- `R2`: acceleratore;
+- `L2`: freno;
+- `SHARE`: scarta il tentativo e riavvia la gara;
+- `OPTIONS` due volte entro 2,5 secondi: scarta ed esce;
+- `Ctrl+C`: scarta ed esce.
+
+Il dataset viene scritto in:
+
+```text
+data/torcs_ps4_dataset.csv
 ```
 
-## Guida manuale
+Un tentativo viene salvato soltanto dopo un giro completo. Un'uscita di pista,
+un restart, una disconnessione o un'interruzione eliminano tutte le righe
+temporanee del tentativo.
+
+Il CSV salva sensori TORCS e intenzioni del pilota prima degli aiuti elettronici.
+ABS, controllo trazione, smoothing e limite sterzo non contaminano quindi i
+target che verranno usati dal pilota automatico.
+
+Il mapping predefinito pygame e:
+
+```text
+asse 0 = stick sinistro X
+asse 4 = L2
+asse 5 = R2
+pulsante 4 = SHARE
+pulsante 6 = OPTIONS
+```
+
+Se il sistema assegna numeri diversi al controller, modifica le costanti
+raccolte all'inizio di `craizy_manual.py`.
+
+## Guida automatica
 
 Avvia TORCS nello stesso modo, poi:
 
 ```powershell
-py .\src\manual_control.py --port 3001
+py craizy_auto.py
 ```
 
-Oppure:
+Il pilota:
 
-```powershell
-.\scripts\run_manual.ps1
+1. usa la logica stabile di `torcs_jm_par_modulare.py`;
+2. cerca automaticamente `data/torcs_ps4_dataset.csv`;
+3. costruisce un profilo umano per settori di 5 metri;
+4. usa il profilo al 35% solo quando velocita, angolo e posizione sono compatibili;
+5. torna automaticamente alla guida stabile quando il dataset manca o non e
+   affidabile per la situazione corrente;
+6. applica gli stessi ADAS usati dal controller manuale.
+
+Il riepilogo di ogni prova viene aggiunto a:
+
+```text
+results/auto_runs.csv
 ```
 
-Comandi:
+## Struttura
 
-- `W` o freccia su: accelera.
-- `S`, freccia giu' o spazio: frena.
-- `A`/freccia sinistra e `D`/freccia destra: sterza.
-- `Q`/`E`: scala/aumenta marcia e disattiva cambio automatico.
-- `G`: attiva/disattiva cambio automatico.
-- `X`: attiva/disattiva stabilizzazione leggera.
-- `R`: retromarcia.
-- `Esc`: esci.
-
-I log automatici vengono scritti in `results/runs/`; i log manuali in `results/manual_runs/`, salvo uso di `--no-log`.
-
-## Workflow
-
-1. Usa `src/driver/config.py` come unico punto di tuning del pilota da gara.
-2. Usa `src/manual_control.py` per provare il tracciato e raccogliere dati.
-3. Registra ogni prova in `docs/test_report.md`.
-4. Documenta l'uso di IBM Granite in `docs/granite_usage_log.md`.
-5. Usa `src/training/behavioral_cloning.py` solo dopo aver raccolto dataset puliti.
-
-## Verifica locale
-
-```powershell
-py -m unittest discover -s tests
+```text
+craizy_auto.py
+craizy_manual.py
+torcs_jm_par_modulare.py
+controller_ps4_torcs_dataset_auto_stop_v2 (1).py
+snakeoil3_jm2.py
+data/
+results/
+archive/
 ```
 
-Oppure:
-
-```powershell
-.\scripts\run_tests.ps1
-```
+Le costanti principali sono raccolte all'inizio di `craizy_auto.py` e
+`craizy_manual.py`. Non sono necessari file di configurazione o argomenti CLI.
