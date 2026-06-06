@@ -5,3 +5,5 @@ venv/
 *.tmp
 
 results/*.csv
+auto_*_runs.csv
+auto_*_trace.csv

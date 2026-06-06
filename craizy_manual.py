@@ -1,11 +1,12 @@
 import csv
 import importlib.util
 import os
+import socket
 import sys
 import time
 from pathlib import Path
 
-from craizy_auto import DATASET_COLUMNS, DATASET_PATH, PORT, SharedADAS
+from craizy_auto import DATASET_COLUMNS, PORT, SharedADAS
 
 
 # ============================================================
@@ -15,11 +16,15 @@ from craizy_auto import DATASET_COLUMNS, DATASET_PATH, PORT, SharedADAS
 LEGACY_CONTROLLER_PATH = Path(__file__).with_name(
     "controller_ps4_torcs_dataset_auto_stop_v2 (1).py"
 )
+DATASET_PATH = str(Path(__file__).with_name("torcs_ps4_dataset.csv"))
 
-OPTIONS_CONFIRM_SECONDS = 2.5
 OFFTRACK_CONFIRM_TICKS = 10
 OFFTRACK_TRACK_POS = 1.05
 PRINT_EVERY = 50
+SERVER_SILENCE_TIMEOUTS = 3
+SERVER_FINISH_MIN_SECONDS = 45.0
+SERVER_FINISH_MIN_DISTANCE = 3500.0
+SERVER_FINISH_MIN_ROWS = 1000
 
 
 def load_legacy_controller():
@@ -66,9 +71,9 @@ class SupremePS4Controller:
     def __init__(self):
         self.running = True
         self.restart_requested = False
+        self.save_restart_requested = False
         self.exit_requested = False
         self.stop_reason = ""
-        self.options_armed_at = None
 
         pygame.init()
         pygame.joystick.init()
@@ -85,19 +90,12 @@ class SupremePS4Controller:
 
     def reset_requests(self):
         self.restart_requested = False
+        self.save_restart_requested = False
         self.exit_requested = False
-        self.options_armed_at = None
 
     def process_events(self):
         self.restart_requested = False
-        now = time.monotonic()
-
-        if (
-            self.options_armed_at is not None
-            and now - self.options_armed_at > OPTIONS_CONFIRM_SECONDS
-        ):
-            self.options_armed_at = None
-            print("\n[OPTIONS] Conferma scaduta.")
+        self.save_restart_requested = False
 
         removed_event = getattr(pygame, "JOYDEVICEREMOVED", None)
         for event in pygame.event.get():
@@ -119,25 +117,14 @@ class SupremePS4Controller:
 
             if event.button == SHARE_BUTTON:
                 self.restart_requested = True
-                self.options_armed_at = None
+                self.save_restart_requested = False
                 print("\n[SHARE] Tentativo scartato. Riavvio gara.")
                 continue
 
             if event.button == OPTIONS_BUTTON:
-                if (
-                    self.options_armed_at is not None
-                    and now - self.options_armed_at <= OPTIONS_CONFIRM_SECONDS
-                ):
-                    self.running = False
-                    self.exit_requested = True
-                    self.stop_reason = "options_confirmed"
-                    print("\n[OPTIONS] Uscita confermata. Tentativo scartato.")
-                else:
-                    self.options_armed_at = now
-                    print(
-                        "\n[OPTIONS] Premi di nuovo entro %.1f secondi per uscire."
-                        % OPTIONS_CONFIRM_SECONDS
-                    )
+                self.restart_requested = False
+                self.save_restart_requested = True
+                print("\n[OPTIONS] Salvo il tentativo e riavvio la gara.")
 
     def intention(self):
         self.process_events()
@@ -255,10 +242,75 @@ class TransactionalDataset:
         return committed
 
 
+class RaceProgress:
+    def __init__(self):
+        self.max_dist_raced = 0.0
+        self.max_dist_from_start = 0.0
+
+    def observe(self, sensors):
+        self.max_dist_raced = max(
+            self.max_dist_raced,
+            legacy.safe_float(sensors.get("distRaced", 0.0)),
+        )
+        self.max_dist_from_start = max(
+            self.max_dist_from_start,
+            legacy.safe_float(sensors.get("distFromStart", 0.0)),
+        )
+
+    def confirms_corkscrew_finish(self, elapsed, dataset):
+        distance = max(self.max_dist_raced, self.max_dist_from_start)
+        return (
+            dataset.valid
+            and len(dataset.rows) >= SERVER_FINISH_MIN_ROWS
+            and elapsed >= SERVER_FINISH_MIN_SECONDS
+            and distance >= SERVER_FINISH_MIN_DISTANCE
+        )
+
+
 def create_client():
     client = snakeoil3.Client(p=PORT, vision=False)
     client.get_servers_input()
     return client
+
+
+def receive_server_input(client):
+    """Receive one telemetry packet without waiting forever after the race."""
+    if client is None or getattr(client, "so", None) is None:
+        return "closed"
+
+    timeouts = 0
+    while timeouts < SERVER_SILENCE_TIMEOUTS:
+        try:
+            sockdata, _ = client.so.recvfrom(snakeoil3.data_size)
+            sockdata = sockdata.decode("utf-8")
+        except socket.timeout:
+            timeouts += 1
+            print(".", end=" ", flush=True)
+            continue
+        except OSError:
+            client.shutdown()
+            return "socket_error"
+
+        if "***identified***" in sockdata:
+            continue
+        if "***shutdown***" in sockdata:
+            print(
+                "\nServer TORCS ha terminato la gara sulla porta %d."
+                % client.port
+            )
+            client.shutdown()
+            return "shutdown"
+        if "***restart***" in sockdata:
+            print("\nServer TORCS ha riavviato la gara sulla porta %d." % client.port)
+            client.shutdown()
+            return "restart"
+        if not sockdata:
+            continue
+
+        client.S.parse_server_str(sockdata)
+        return "data"
+
+    return "timeout"
 
 
 def restart_client(client):
@@ -304,6 +356,7 @@ def main():
     dataset = TransactionalDataset()
     adas = SharedADAS()
     finish_detector = legacy.RaceFinishDetector()
+    race_progress = RaceProgress()
     attempt_started_at = time.time()
     step = 0
     stop_reason = "unknown"
@@ -316,8 +369,9 @@ def main():
         print(" crAIzy pilots - DUALSHOCK 4 DATASET CONTROLLER")
         print("=" * 72)
         print(" Stick sinistro = sterzo | R2 = gas | L2 = freno")
-        print(" SHARE = scarta e riparti | OPTIONS x2 = scarta ed esci")
-        print(" Dataset valido solo dopo un giro completo: %s" % DATASET_PATH)
+        print(" SHARE = scarta e riparti | OPTIONS = salva e riparti")
+        print(" Ctrl+C = scarta il tentativo ed esce")
+        print(" Dataset: %s" % DATASET_PATH)
         print("=" * 72)
 
         while controller.running:
@@ -327,6 +381,7 @@ def main():
 
             sensors = client.S.d
             elapsed = time.time() - attempt_started_at
+            race_progress.observe(sensors)
             finished, finish_reason = finish_detector.update(sensors, elapsed)
 
             if finished:
@@ -350,16 +405,39 @@ def main():
                 stop_reason = controller.stop_reason or "controller_exit"
                 break
 
-            if controller.restart_requested:
-                dataset.discard("restart")
+            if (
+                controller.restart_requested
+                or controller.save_restart_requested
+            ):
+                if controller.save_restart_requested:
+                    if dataset.valid and dataset.rows:
+                        committed = dataset.commit()
+                        print(
+                            "[OPTIONS] %d righe aggiunte a %s."
+                            % (committed, DATASET_PATH)
+                        )
+                    else:
+                        print(
+                            "[OPTIONS] Nessun dato salvato: tentativo %s."
+                            % (
+                                dataset.invalid_reason
+                                if not dataset.valid
+                                else "vuoto"
+                            )
+                        )
+                else:
+                    discarded = dataset.discard("share_restart")
+                    print("[SHARE] %d righe temporanee eliminate." % discarded)
+
                 adas.reset()
                 finish_detector = legacy.RaceFinishDetector()
+                race_progress = RaceProgress()
                 attempt_started_at = time.time()
                 step = 0
                 client = restart_client(client)
                 dataset.reset()
                 controller.reset_requests()
-                print("[RESTART] Nuovo tentativo pronto.")
+                print("[RESTART] Pista e registrazione riavviate.")
                 continue
 
             dataset.observe_track(sensors)
@@ -367,8 +445,28 @@ def main():
             dataset.append(sensors, intention, action["gear"])
             client.R.d.update(action)
             client.respond_to_server()
-            client.get_servers_input()
+            receive_status = receive_server_input(client)
             step += 1
+
+            if receive_status != "data":
+                elapsed = time.time() - attempt_started_at
+                if race_progress.confirms_corkscrew_finish(elapsed, dataset):
+                    committed = dataset.commit()
+                    print(
+                        "\n[GIRO COMPLETO] %d righe aggiunte a %s."
+                        % (committed, DATASET_PATH)
+                    )
+                    print(
+                        "[GIRO COMPLETO] Confermato dalla fine del server "
+                        "dopo %.0f m." % max(
+                            race_progress.max_dist_raced,
+                            race_progress.max_dist_from_start,
+                        )
+                    )
+                    stop_reason = "lap_complete_server_" + receive_status
+                else:
+                    stop_reason = "server_" + receive_status
+                break
 
             if step % PRINT_EVERY == 0:
                 sys.stdout.write(
@@ -404,7 +502,7 @@ def main():
             controller.stop()
         print()
         print("Sessione terminata: %s" % stop_reason)
-        if stop_reason != "lap_complete":
+        if not stop_reason.startswith("lap_complete"):
             print("Righe temporanee scartate: %d" % discarded)
 
 
