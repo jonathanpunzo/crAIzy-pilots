@@ -73,10 +73,8 @@ ophelp+= ' --track, -t <track>  Your name for this track. Used for learning. [un
 ophelp+= ' --stage, -s <#>      0=warm up, 1=qualifying, 2=race, 3=unknown. [3]\n'
 ophelp+= ' --debug, -d          Output full telemetry.\n'
 ophelp+= ' --help, -h           Show this help.\n'
-ophelp+= ' --version, -v        Show current version.'
 usage= 'Usage: %s [ophelp [optargs]] \n' % sys.argv[0]
 usage= usage + ophelp
-version= "20130505-2"
 
 def clip(v,lo,hi):
     if v<lo: return lo
@@ -191,10 +189,10 @@ class Client():
 
     def parse_the_command_line(self):
         try:
-            (opts, args) = getopt.getopt(sys.argv[1:], 'H:p:i:m:e:t:s:dhv',
+            (opts, args) = getopt.getopt(sys.argv[1:], 'H:p:i:m:e:t:s:dh',
                        ['host=','port=','id=','steps=',
                         'episodes=','track=','stage=',
-                        'debug','help','version'])
+                        'debug','help'])
         except getopt.error as why:
             print('getopt error: %s\n%s' % (why, usage))
             sys.exit(-1)
@@ -219,9 +217,6 @@ class Client():
                     self.maxEpisodes= int(opt[1])
                 if opt[0] == '-m' or opt[0] == '--steps':
                     self.maxSteps= int(opt[1])
-                if opt[0] == '-v' or opt[0] == '--version':
-                    print('%s %s' % (sys.argv[0], version))
-                    sys.exit(0)
         except ValueError as why:
             print('Bad parameter \'%s\' for option %s: %s\n%s' % (
                                        opt[1], opt[0], why, usage))

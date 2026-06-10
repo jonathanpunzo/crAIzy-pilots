@@ -28,16 +28,16 @@ from sklearn.neighbors import KNeighborsRegressor
 import snakeoil3_jm2 as snakeoil3
 
 
-DRIVER_VERSION = "craizy_auto_v8_sensor_base_residual_knn_v9r7_s05_projection"
+DRIVER_NAME = "crAIzy Auto"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_PATH = os.path.join(BASE_DIR, "torcs_ps4_dataset.csv")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
-TRACE_PATH = os.path.join(LOG_DIR, "auto_v8_latest.csv")
-TRACE_ARCHIVE_DIR = os.path.join(LOG_DIR, "auto_v8_runs")
-RUNS_PATH = os.path.join(RESULTS_DIR, "auto_v8_runs.csv")
-ANALYSIS_PATH = os.path.join(RESULTS_DIR, "auto_v8_analysis.csv")
-VALIDATION_PATH = os.path.join(RESULTS_DIR, "auto_v8_validation.csv")
+TRACE_PATH = os.path.join(LOG_DIR, "craizy_auto_latest.csv")
+TRACE_ARCHIVE_DIR = os.path.join(LOG_DIR, "craizy_auto_runs")
+RUNS_PATH = os.path.join(RESULTS_DIR, "craizy_auto_runs.csv")
+ANALYSIS_PATH = os.path.join(RESULTS_DIR, "craizy_auto_analysis.csv")
+VALIDATION_PATH = os.path.join(RESULTS_DIR, "craizy_auto_validation.csv")
 
 PORT = 3001
 MAX_STEPS = 100000
@@ -1256,7 +1256,7 @@ class ValidationMetrics:
 
 def validation_fields():
     fields = [
-        "timestamp", "version", "mode", "reason", "lap_time", "clean",
+        "timestamp", "mode", "reason", "lap_time", "clean",
         "max_speed", "offtrack_steps", "recovery_steps",
         "p95_inference_ms",
     ]
@@ -1341,8 +1341,7 @@ def print_validation_report(limit):
     with open(VALIDATION_PATH, newline="", encoding="utf-8") as source:
         rows = [
             row for row in csv.DictReader(source)
-            if row.get("version") == DRIVER_VERSION
-            and row.get("mode") == "full"
+            if row.get("mode") == "full"
         ][-limit:]
     report = validation_summary(rows)
     print(
@@ -1540,7 +1539,7 @@ def run_driver(dataset, base_only, slow, snakeoil_arguments):
         exists = os.path.exists(RUNS_PATH)
         with open(RUNS_PATH, "a", newline="", encoding="utf-8") as output:
             fields = (
-                "timestamp", "version", "mode", "reason", "max_distance",
+                "timestamp", "mode", "reason", "max_distance",
                 "max_speed", "offtrack_steps", "recovery_steps",
                 "p95_inference_ms",
             )
@@ -1549,7 +1548,6 @@ def run_driver(dataset, base_only, slow, snakeoil_arguments):
                 writer.writeheader()
             writer.writerow({
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "version": DRIVER_VERSION,
                 "mode": "slow" if slow else ("base" if base_only else "full"),
                 "reason": reason,
                 "max_distance": summary["max_distance"],
@@ -1565,7 +1563,6 @@ def run_driver(dataset, base_only, slow, snakeoil_arguments):
         )
         append_validation({
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "version": DRIVER_VERSION,
             "mode": "slow" if slow else ("base" if base_only else "full"),
             "reason": reason,
             "lap_time": summary["lap_time"],
@@ -1606,6 +1603,7 @@ def parse_arguments(argv=None):
 
 def main():
     arguments, snakeoil_arguments = parse_arguments()
+    print("[DRIVER] %s" % DRIVER_NAME)
     if arguments.validation_report:
         print_validation_report(max(1, arguments.validation_runs))
         return

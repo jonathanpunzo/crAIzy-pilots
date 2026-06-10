@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 *.tmp
+*.mp4
 
 results/*.csv
 auto_*_runs.csv

@@ -121,9 +121,11 @@ Il circuito e' descritto da dieci blocchi contigui:
 | S09_LAST_CORNER | 3080-3310 m | ultima curva protetta |
 | S10 | 3310-3610 m | rettilineo finale |
 
-Le correzioni locali su S03, Corkscrew e ultima curva sono limitate a
-finestre e condizioni dinamiche precise. Non sostituiscono la policy normale
-quando traiettoria e velocita' sono gia' corrette.
+Le correzioni locali su S03, S05, Corkscrew e ultima curva sono limitate a
+finestre e condizioni dinamiche precise. In S05 una frenata preventiva si
+attiva soltanto quando la posizione proiettata converge oltre il bordo
+interno. Queste protezioni non sostituiscono la policy normale quando
+traiettoria e velocita' sono gia' corrette.
 
 ### ADAS e cambio
 
@@ -207,15 +209,22 @@ traiettoria non identica alle dimostrazioni ma influenzata dal KNN entro
 limiti espliciti. Le differenze rispetto al pilota umano derivano dalla base
 sensoriale, dai vincoli di sicurezza e dalla natura residuale del modello.
 
-## 7. Riproduzione
+## 7. Ambiente e riproduzione
+
+Il progetto viene eseguito nell'ambiente Anaconda predisposto dai docenti,
+che include Python, NumPy, scikit-learn e pygame. NumPy gestisce i vettori
+numerici, scikit-learn fornisce `KNeighborsRegressor` e pygame acquisisce gli
+input del DualShock 4 durante la raccolta manuale.
+
+Non e' prevista un'installazione locale delle dipendenze. Con l'ambiente del
+corso attivo:
 
 ```powershell
-pip install -r requirements.txt
-python -m unittest test_craizy_auto_v8.py
-python craizy_auto_v8.py --analyze-only
-python craizy_auto_v8.py
-python craizy_auto_v8.py --base-only
-python craizy_auto_v8.py --validation-report --validation-runs 10
+python -m unittest test_craizy_auto.py
+python craizy_auto.py --analyze-only
+python craizy_auto.py
+python craizy_auto.py --base-only
+python craizy_auto.py --validation-report --validation-runs 10
 ```
 
 I risultati dipendono dalla configurazione di TORCS, dalla pista Corkscrew,

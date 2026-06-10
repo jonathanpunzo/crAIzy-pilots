@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-import craizy_auto_v8 as v8
+import craizy_auto as auto
 
 
 def sensors(**overrides):
@@ -26,20 +26,20 @@ def sensors(**overrides):
 
 class BasePolicyTests(unittest.TestCase):
     def test_track_position_sign_centers_the_car(self):
-        policy = v8.BaseSensorPolicy()
+        policy = auto.BaseSensorPolicy()
         left = policy.action_intent(sensors(trackPos=0.5))
         right = policy.action_intent(sensors(trackPos=-0.5))
         self.assertLess(left["steer"], 0.0)
         self.assertGreater(right["steer"], 0.0)
 
     def test_slow_mode_caps_target_speed(self):
-        intent = v8.BaseSensorPolicy(slow=True).action_intent(
+        intent = auto.BaseSensorPolicy(slow=True).action_intent(
             sensors(track=[200.0] * 19)
         )
-        self.assertLessEqual(intent["target_speed"], v8.SLOW_SPEED_CAP)
+        self.assertLessEqual(intent["target_speed"], auto.SLOW_SPEED_CAP)
 
     def test_closed_track_reduces_target_speed(self):
-        policy = v8.BaseSensorPolicy()
+        policy = auto.BaseSensorPolicy()
         open_road = policy.action_intent(sensors(track=[200.0] * 19))
         closed_road = policy.action_intent(sensors(track=[35.0] * 19))
         self.assertLess(
@@ -51,7 +51,7 @@ class BasePolicyTests(unittest.TestCase):
         left_curve[2] = 80.0
         right_curve = [15.0] * 19
         right_curve[16] = 80.0
-        policy = v8.BaseSensorPolicy()
+        policy = auto.BaseSensorPolicy()
         self.assertGreater(
             policy.action_intent(sensors(track=left_curve))["steer"],
             0.0,
@@ -78,10 +78,10 @@ class AutomaticGearboxTests(unittest.TestCase):
         )
         for current, target, upshift_speed, post_shift_speed in transitions:
             with self.subTest(current=current):
-                gearbox = v8.AutomaticGearbox()
+                gearbox = auto.AutomaticGearbox()
                 gearbox.gear = current
                 shifted = gearbox.update(
-                    self.state(upshift_speed, v8.UPSHIFT_RPM, current),
+                    self.state(upshift_speed, auto.UPSHIFT_RPM, current),
                     accel=1.0,
                     now=0.0,
                 )
@@ -90,17 +90,17 @@ class AutomaticGearboxTests(unittest.TestCase):
                     gearbox.update(
                         self.state(post_shift_speed, 6000.0, target),
                         accel=1.0,
-                        now=v8.SHIFT_COOLDOWN + 0.01,
+                        now=auto.SHIFT_COOLDOWN + 0.01,
                     ),
                     target,
                 )
 
     def test_pending_shift_ignores_stale_sensor_during_cooldown(self):
-        gearbox = v8.AutomaticGearbox()
+        gearbox = auto.AutomaticGearbox()
         gearbox.gear = 3
         self.assertEqual(
             gearbox.update(
-                self.state(98.0, v8.UPSHIFT_RPM, 3),
+                self.state(98.0, auto.UPSHIFT_RPM, 3),
                 accel=1.0,
                 now=0.0,
             ),
@@ -110,13 +110,13 @@ class AutomaticGearboxTests(unittest.TestCase):
             gearbox.update(
                 self.state(90.0, 6500.0, 3),
                 accel=1.0,
-                now=v8.SHIFT_COOLDOWN / 2.0,
+                now=auto.SHIFT_COOLDOWN / 2.0,
             ),
             4,
         )
 
     def test_strong_acceleration_blocks_ordinary_downshift(self):
-        gearbox = v8.AutomaticGearbox()
+        gearbox = auto.AutomaticGearbox()
         gearbox.gear = 4
         self.assertEqual(
             gearbox.update(
@@ -128,7 +128,7 @@ class AutomaticGearboxTests(unittest.TestCase):
         )
 
     def test_braking_and_panic_rpm_still_allow_downshift(self):
-        braking = v8.AutomaticGearbox()
+        braking = auto.AutomaticGearbox()
         braking.gear = 4
         self.assertEqual(
             braking.update(
@@ -140,7 +140,7 @@ class AutomaticGearboxTests(unittest.TestCase):
             3,
         )
 
-        panic = v8.AutomaticGearbox()
+        panic = auto.AutomaticGearbox()
         panic.gear = 4
         self.assertEqual(
             panic.update(
@@ -151,7 +151,7 @@ class AutomaticGearboxTests(unittest.TestCase):
             3,
         )
 
-    def test_manual_and_v8_gearboxes_remain_identical(self):
+    def test_manual_and_auto_gearboxes_remain_identical(self):
         root = Path(__file__).resolve().parent
 
         def gearbox_ast(path):
@@ -165,7 +165,7 @@ class AutomaticGearboxTests(unittest.TestCase):
 
         self.assertEqual(
             gearbox_ast(root / "craizy_manual.py"),
-            gearbox_ast(root / "craizy_auto_v8.py"),
+            gearbox_ast(root / "craizy_auto.py"),
         )
 
     def test_dataset_replay_has_no_shift_oscillation(self):
@@ -177,7 +177,7 @@ class AutomaticGearboxTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(runs), 4)
         for run_id, rows in runs.items():
-            gearbox = v8.AutomaticGearbox()
+            gearbox = auto.AutomaticGearbox()
             shifts = []
             for row in rows:
                 previous = gearbox.gear
@@ -224,30 +224,30 @@ class ValidationTests(unittest.TestCase):
             "S10",
         )
         self.assertEqual(
-            tuple(block.name for block in v8.TRACK_BLOCKS),
+            tuple(block.name for block in auto.TRACK_BLOCKS),
             expected,
         )
         self.assertEqual(
-            v8.track_block_at(400.0).name,
+            auto.track_block_at(400.0).name,
             "S02_FIRST_CORNER",
         )
         self.assertEqual(
-            v8.track_block_at(2400.0).name,
+            auto.track_block_at(2400.0).name,
             "S07_CORKSCREW",
         )
         self.assertEqual(
-            v8.track_block_at(3200.0).name,
+            auto.track_block_at(3200.0).name,
             "S09_LAST_CORNER",
         )
 
     def test_track_blocks_are_contiguous(self):
         for left, right in zip(
-            v8.TRACK_BLOCKS, v8.TRACK_BLOCKS[1:]
+            auto.TRACK_BLOCKS, auto.TRACK_BLOCKS[1:]
         ):
             self.assertEqual(left.end, right.start)
 
     def test_validation_metrics_collect_sector_values(self):
-        metrics = v8.ValidationMetrics()
+        metrics = auto.ValidationMetrics()
         metrics.observe(sensors(
             curLapTime=1.0,
             distFromStart=100.0,
@@ -287,7 +287,7 @@ class ValidationTests(unittest.TestCase):
                 "clean": "0",
             },
         ]
-        report = v8.validation_summary(rows)
+        report = auto.validation_summary(rows)
         self.assertEqual(report["attempts"], 3)
         self.assertEqual(report["clean"], 2)
         self.assertEqual(report["best"], 90.0)
@@ -304,11 +304,11 @@ class ValidationTests(unittest.TestCase):
             "offtrack_steps": "0",
             "recovery_steps": "0",
         }
-        for name, _, _ in v8.VALIDATION_SECTORS:
+        for name, _, _ in auto.VALIDATION_SECTORS:
             row["%s_time" % name] = "9.0"
             row["%s_avg_speed" % name] = "150.0"
             row["%s_max_track_pos" % name] = "0.5"
-        report = v8.validation_summary([row])
+        report = auto.validation_summary([row])
         self.assertEqual(report["completed"], 1)
         self.assertEqual(report["clean"], 1)
         self.assertEqual(report["median"], 90.0)
@@ -341,25 +341,25 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             [1.0, 100.0],
             [1.0, 100.0],
         ])
-        prediction = v8.ResidualAdvisor(features, targets).predict(
+        prediction = auto.ResidualAdvisor(features, targets).predict(
             features[0]
         )
         self.assertLessEqual(
-            abs(prediction["delta_steer"]), v8.MAX_STEER_ADVICE
+            abs(prediction["delta_steer"]), auto.MAX_STEER_ADVICE
         )
         self.assertLessEqual(
-            abs(prediction["delta_speed"]), v8.MAX_SPEED_ADVICE
+            abs(prediction["delta_speed"]), auto.MAX_SPEED_ADVICE
         )
 
     def test_runtime_diagnostics_include_track_block(self):
-        _, diagnostics = v8.RuntimePolicy().action(
+        _, diagnostics = auto.RuntimePolicy().action(
             sensors(distFromStart=1200.0)
         )
         self.assertEqual(diagnostics["track_block"], "S04")
         self.assertEqual(diagnostics["track_block_role"], "fast")
 
     def test_runtime_diagnostics_include_vehicle_dynamics(self):
-        action, diagnostics = v8.RuntimePolicy().action(
+        action, diagnostics = auto.RuntimePolicy().action(
             sensors(
                 distFromStart=1800.0,
                 trackPos=-0.4,
@@ -378,8 +378,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
 
     def test_edge_brake_overrides_positive_advice(self):
         state = sensors(trackPos=0.96, speedX=180.0)
-        base = v8.BaseSensorPolicy().action_intent(state)
-        governed = v8.SafetyGovernor().apply(
+        base = auto.BaseSensorPolicy().action_intent(state)
+        governed = auto.SafetyGovernor().apply(
             state,
             base,
             {"delta_steer": 0.12, "delta_speed": 25.0},
@@ -390,9 +390,9 @@ class AdvisorAndSafetyTests(unittest.TestCase):
 
     def test_base_braking_has_priority(self):
         state = sensors(speedX=260.0, track=[35.0] * 19)
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         self.assertLess(base["pedal"], 0.0)
-        governed = v8.SafetyGovernor().apply(
+        governed = auto.SafetyGovernor().apply(
             state,
             base,
             {"delta_steer": 0.0, "delta_speed": 25.0},
@@ -401,11 +401,11 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         self.assertGreater(governed["brake"], 0.0)
 
     def test_projected_edge_adds_inward_steering(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         governor.previous_track_pos = -0.50
         governor.track_pos_rate = -0.01
         state = sensors(trackPos=-0.54, speedX=120.0)
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -415,13 +415,13 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         self.assertIn("projected_edge", governed["interventions"])
 
     def test_tight_curve_cap_survives_brief_sensor_reopening(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         tight_state = sensors(
             speedX=120.0,
             distFromStart=2450.0,
             track=[22.0] * 19,
         )
-        tight_base = v8.BaseSensorPolicy().action_intent(tight_state)
+        tight_base = auto.BaseSensorPolicy().action_intent(tight_state)
         first = governor.apply(
             tight_state,
             tight_base,
@@ -432,7 +432,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=2470.0,
             track=[100.0] * 19,
         )
-        open_base = v8.BaseSensorPolicy().action_intent(open_state)
+        open_base = auto.BaseSensorPolicy().action_intent(open_state)
         second = governor.apply(
             open_state,
             open_base,
@@ -443,13 +443,13 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         self.assertIn("tight_curve_hold", second["interventions"])
 
     def test_normal_curve_uses_faster_cap(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         state = sensors(
             speedX=120.0,
             distFromStart=1500.0,
             track=[22.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -458,14 +458,14 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         self.assertGreaterEqual(governed["target_speed"], 105.0)
         self.assertEqual(
             governed["tight_curve_ticks"],
-            v8.FAST_CURVE_HOLD_TICKS,
+            auto.FAST_CURVE_HOLD_TICKS,
         )
         self.assertIn(
             "performance_bonus", governed["interventions"]
         )
 
     def test_performance_bonus_skips_protected_sectors(self):
-        base_policy = v8.BaseSensorPolicy()
+        base_policy = auto.BaseSensorPolicy()
         normal = sensors(
             speedX=120.0,
             distFromStart=2000.0,
@@ -476,12 +476,12 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=2400.0,
             track=[80.0] * 19,
         )
-        normal_governed = v8.SafetyGovernor().apply(
+        normal_governed = auto.SafetyGovernor().apply(
             normal,
             base_policy.action_intent(normal),
             {"delta_steer": 0.0, "delta_speed": 0.0},
         )
-        protected_governed = v8.SafetyGovernor().apply(
+        protected_governed = auto.SafetyGovernor().apply(
             protected,
             base_policy.action_intent(protected),
             {"delta_steer": 0.0, "delta_speed": 0.0},
@@ -501,8 +501,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=420.0,
             track=[22.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
-        governed = v8.SafetyGovernor().apply(
+        base = auto.BaseSensorPolicy().action_intent(state)
+        governed = auto.SafetyGovernor().apply(
             state,
             base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
@@ -518,8 +518,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=360.0,
             track=[100.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
-        governed = v8.SafetyGovernor().apply(
+        base = auto.BaseSensorPolicy().action_intent(state)
+        governed = auto.SafetyGovernor().apply(
             state,
             base,
             {"delta_steer": 0.0, "delta_speed": 25.0},
@@ -531,7 +531,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_protected_edge_adds_extra_inward_steering(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         governor.previous_track_pos = 0.62
         governor.track_pos_rate = 0.01
         state = sensors(
@@ -539,7 +539,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             trackPos=0.70,
             distFromStart=2400.0,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -551,28 +551,28 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_corkscrew_rescue_activates_only_outside_clean_corridor(self):
-        clean_governor = v8.SafetyGovernor()
+        clean_governor = auto.SafetyGovernor()
         clean_governor.previous_track_pos = -0.12
         clean_state = sensors(
             speedX=225.0,
             trackPos=-0.12,
             distFromStart=2275.0,
         )
-        clean_base = v8.BaseSensorPolicy().action_intent(clean_state)
+        clean_base = auto.BaseSensorPolicy().action_intent(clean_state)
         clean = clean_governor.apply(
             clean_state,
             clean_base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
         )
 
-        risk_governor = v8.SafetyGovernor()
+        risk_governor = auto.SafetyGovernor()
         risk_governor.previous_track_pos = -0.35
         risk_state = sensors(
             speedX=225.0,
             trackPos=-0.40,
             distFromStart=2275.0,
         )
-        risk_base = v8.BaseSensorPolicy().action_intent(risk_state)
+        risk_base = auto.BaseSensorPolicy().action_intent(risk_state)
         risk = risk_governor.apply(
             risk_state,
             risk_base,
@@ -596,8 +596,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             trackPos=0.05,
             distFromStart=685.0,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
-        result = v8.SafetyGovernor().apply(
+        base = auto.BaseSensorPolicy().action_intent(state)
+        result = auto.SafetyGovernor().apply(
             state,
             base,
             {"delta_steer": 0.0, "delta_speed": 25.0},
@@ -627,18 +627,18 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             trackPos=0.05,
             distFromStart=685.0,
         )
-        distance_base = v8.BaseSensorPolicy().action_intent(
+        distance_base = auto.BaseSensorPolicy().action_intent(
             outside_distance
         )
-        line_base = v8.BaseSensorPolicy().action_intent(safe_line)
-        speed_base = v8.BaseSensorPolicy().action_intent(safe_speed)
-        distance_result = v8.SafetyGovernor().apply(
+        line_base = auto.BaseSensorPolicy().action_intent(safe_line)
+        speed_base = auto.BaseSensorPolicy().action_intent(safe_speed)
+        distance_result = auto.SafetyGovernor().apply(
             outside_distance, distance_base, advisor
         )
-        line_result = v8.SafetyGovernor().apply(
+        line_result = auto.SafetyGovernor().apply(
             safe_line, line_base, advisor
         )
-        speed_result = v8.SafetyGovernor().apply(
+        speed_result = auto.SafetyGovernor().apply(
             safe_speed, speed_base, advisor
         )
 
@@ -656,7 +656,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_s05_projection_brakes_only_diverging_line(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         governor.previous_track_pos = -0.35
         governor.track_pos_rate = -0.04
         risky = sensors(
@@ -664,7 +664,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             trackPos=-0.42,
             distFromStart=1950.0,
         )
-        base = v8.BaseSensorPolicy().action_intent(risky)
+        base = auto.BaseSensorPolicy().action_intent(risky)
         result = governor.apply(
             risky,
             base,
@@ -678,7 +678,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         self.assertLessEqual(result["target_speed"], 155.0)
 
     def test_s05_projection_preserves_stable_line(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         governor.previous_track_pos = -0.18
         governor.track_pos_rate = -0.02
         stable = sensors(
@@ -686,7 +686,7 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             trackPos=-0.24,
             distFromStart=1950.0,
         )
-        base = v8.BaseSensorPolicy().action_intent(stable)
+        base = auto.BaseSensorPolicy().action_intent(stable)
         result = governor.apply(
             stable,
             base,
@@ -705,8 +705,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=1200.0,
             track=[70.0] * 19,
         )
-        normal_base = v8.BaseSensorPolicy().action_intent(normal_state)
-        normal = v8.SafetyGovernor(speed_profile=profile).apply(
+        normal_base = auto.BaseSensorPolicy().action_intent(normal_state)
+        normal = auto.SafetyGovernor(speed_profile=profile).apply(
             normal_state,
             normal_base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
@@ -716,17 +716,17 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=2400.0,
             track=[70.0] * 19,
         )
-        protected_base = v8.BaseSensorPolicy().action_intent(
+        protected_base = auto.BaseSensorPolicy().action_intent(
             protected_state
         )
-        protected = v8.SafetyGovernor(speed_profile=profile).apply(
+        protected = auto.SafetyGovernor(speed_profile=profile).apply(
             protected_state,
             protected_base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
         )
         self.assertGreaterEqual(
             normal["target_speed"],
-            260.0 * v8.PERFORMANCE_PROFILE_FACTOR,
+            260.0 * auto.PERFORMANCE_PROFILE_FACTOR,
         )
         self.assertIn(
             "expert_speed_floor", normal["interventions"]
@@ -743,8 +743,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=1200.0,
             track=[70.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
-        governed = v8.SafetyGovernor(speed_profile=profile).apply(
+        base = auto.BaseSensorPolicy().action_intent(state)
+        governed = auto.SafetyGovernor(speed_profile=profile).apply(
             state,
             base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
@@ -760,8 +760,8 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=1200.0,
             track=[25.0] * 19,
         )
-        normal_base = v8.BaseSensorPolicy().action_intent(normal_state)
-        normal = v8.SafetyGovernor(speed_profile=profile).apply(
+        normal_base = auto.BaseSensorPolicy().action_intent(normal_state)
+        normal = auto.SafetyGovernor(speed_profile=profile).apply(
             normal_state,
             normal_base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
@@ -771,17 +771,17 @@ class AdvisorAndSafetyTests(unittest.TestCase):
             distFromStart=2400.0,
             track=[25.0] * 19,
         )
-        protected_base = v8.BaseSensorPolicy().action_intent(
+        protected_base = auto.BaseSensorPolicy().action_intent(
             protected_state
         )
-        protected = v8.SafetyGovernor(speed_profile=profile).apply(
+        protected = auto.SafetyGovernor(speed_profile=profile).apply(
             protected_state,
             protected_base,
             {"delta_steer": 0.0, "delta_speed": 0.0},
         )
         self.assertGreaterEqual(
             normal["target_speed"],
-            200.0 * v8.CURVE_PROFILE_FACTOR,
+            200.0 * auto.CURVE_PROFILE_FACTOR,
         )
         self.assertIn("expert_curve_cap", normal["interventions"])
         self.assertNotIn(
@@ -790,13 +790,13 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         self.assertLess(protected["target_speed"], normal["target_speed"])
 
     def test_last_corner_has_local_speed_cap(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         state = sensors(
             speedX=210.0,
             distFromStart=3200.0,
             track=[100.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -808,14 +808,14 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_last_corner_prepares_outside_line(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         state = sensors(
             speedX=170.0,
             trackPos=0.15,
             distFromStart=3100.0,
             track=[150.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -827,14 +827,14 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_last_corner_does_not_affect_other_sectors(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         state = sensors(
             speedX=170.0,
             trackPos=0.15,
             distFromStart=2000.0,
             track=[150.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -848,14 +848,14 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_last_corner_line_releases_before_apex(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         state = sensors(
             speedX=110.0,
             trackPos=0.10,
             distFromStart=3250.0,
             track=[40.0] * 19,
         )
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,
@@ -869,9 +869,9 @@ class AdvisorAndSafetyTests(unittest.TestCase):
         )
 
     def test_lateral_drift_adds_countersteer(self):
-        governor = v8.SafetyGovernor()
+        governor = auto.SafetyGovernor()
         state = sensors(speedX=100.0, speedY=-10.0)
-        base = v8.BaseSensorPolicy().action_intent(state)
+        base = auto.BaseSensorPolicy().action_intent(state)
         governed = governor.apply(
             state,
             base,

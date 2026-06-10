@@ -11,38 +11,43 @@ l'autorita' finale.
 
 ## Componenti
 
-- `craizy_auto_v8.py`: pilota autonomo, analisi offline e validazione.
+- `craizy_auto.py`: pilota autonomo, analisi offline e validazione.
 - `craizy_manual.py`: guida con DualShock 4 e raccolta transazionale dei giri.
 - `snakeoil3_jm2.py`: client UDP per `scr_server 1`.
 - `torcs_ps4_dataset.csv`: 10 giri completi, 37.726 campioni post-ADAS.
-- `test_craizy_auto_v8.py`: test di policy, KNN, sicurezza, settori e cambio.
+- `test_craizy_auto.py`: test di policy, KNN, sicurezza, settori e cambio.
 - `DOCUMENTAZIONE_PROGETTO.md`: relazione tecnica completa.
 
-## Installazione
+## Ambiente
 
-```powershell
-pip install -r requirements.txt
-```
+Il progetto usa l'ambiente Anaconda predisposto dai docenti. Le dipendenze
+gia' disponibili sono:
 
-TORCS deve essere configurato con `scr_server 1`, porta UDP `3001`, pista
-Corkscrew e sensori pista abilitati.
+- Python per l'esecuzione dei controller;
+- NumPy per vettori e calcolo numerico;
+- scikit-learn per `KNeighborsRegressor`;
+- pygame per leggere il controller DualShock 4.
+
+TORCS e' configurato con `scr_server 1`, porta UDP `3001`, pista Corkscrew e
+sensori pista abilitati. Non e' richiesta una procedura di installazione
+aggiuntiva per l'ambiente del corso.
 
 ## Utilizzo
 
 Avviare prima la gara in TORCS, quindi:
 
 ```powershell
-python craizy_auto_v8.py
+python craizy_auto.py
 ```
 
 Comandi disponibili:
 
 ```powershell
-python craizy_auto_v8.py --base-only
-python craizy_auto_v8.py --base-only --slow
-python craizy_auto_v8.py --analyze-only
-python craizy_auto_v8.py --validation-report --validation-runs 10
-python -m unittest test_craizy_auto_v8.py
+python craizy_auto.py --base-only
+python craizy_auto.py --base-only --slow
+python craizy_auto.py --analyze-only
+python craizy_auto.py --validation-report --validation-runs 10
+python -m unittest test_craizy_auto.py
 ```
 
 La modalita' normale usa il KNN. `--base-only` lo disattiva e lascia attivi
@@ -75,10 +80,9 @@ Il dataset consegnato contiene:
 - tempo registrato tra `75,932 s` e `80,684 s`;
 - velocita' massima osservata tra `265,731` e `273,462 km/h`.
 
-La variante `v9r7_s05_projection` mantiene il dataset da dieci giri e
-aggiunge una frenata preventiva locale tra 1935 e 1975 metri. Interviene
-solo quando la posizione proiettata indica che l'auto sta gia'
-convergendo oltre il bordo interno di S05; i passaggi stabili non
+La protezione del settore S05 applica una frenata preventiva locale tra
+1935 e 1975 metri. Interviene solo quando la posizione proiettata indica che
+l'auto sta gia' convergendo oltre il bordo interno; i passaggi stabili non
 ricevono un limite di velocita' aggiuntivo.
 
 Nella sessione di validazione autonoma registrata:
