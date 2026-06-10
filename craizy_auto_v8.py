@@ -1,4 +1,4 @@
-"""V8: deterministic sensor driver with a bounded residual KNN advisor.
+"""Deterministic TORCS driver with a bounded residual KNN advisor.
 
 The base policy is always capable of driving without the model.  The KNN
 only refines steering and target speed, while the safety governor and the
@@ -1578,7 +1578,7 @@ def run_driver(dataset, base_only, slow, snakeoil_arguments):
 
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(
-        description="V8 TORCS: base sensoriale + advisor KNN residuale."
+        description="crAIzy Auto: base sensoriale + advisor KNN residuale."
     )
     parser.add_argument("--analyze-only", action="store_true")
     parser.add_argument("--base-only", action="store_true")
